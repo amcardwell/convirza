@@ -52,7 +52,7 @@ class FetchReports extends Command
 
             $report_start = $this->getStartDate();
 
-            while($report_start->toDateString() !== now()->startOfMonth()->toDateString()) {
+            while($report_start->lessThanOrEqualTo(now()->startOfMonth())) {
 
                 $date = $report_start->copy();
 
@@ -99,6 +99,10 @@ class FetchReports extends Command
 
     private function reportExists($date, $group): bool
     {
+        if($date->equalTo(now()->startOfMonth())) {
+            return false;
+        }
+
         return ConvirzaReport::where('report_group', $group)
                             ->where('start_date', $date->startOfMonth()->toDateString())
                             ->where('end_date', $date->endOfMonth()->toDateString())
@@ -107,14 +111,13 @@ class FetchReports extends Command
 
     private function saveReport($report, $date, $group)
     {
-        $model = new ConvirzaReport($report);
-
-        $model->fill([
+        $model = ConvirzaReport::firstOrNew([
             'report_group' => $group,
             'start_date' => $date->startOfMonth()->toDateString(),
             'end_date' => $date->endOfMonth()->toDateString(),
-            'created_at' => now()
-        ]);
+        ], $report);
+
+        $model->created_at = now();
 
         $model->save();
     }
