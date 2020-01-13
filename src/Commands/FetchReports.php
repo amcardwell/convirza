@@ -14,7 +14,11 @@ class FetchReports extends Command
      * @var string
      */
     protected $signature = 'convirza:fetchReports
-                            {--start= : The date to start fetching reports}';
+                            {--start= : The date to start fetching reports}
+                            {--limit=100 : Limit the returned results}
+                            {--duration=30 : Filter by call duration}
+                            {--trackingNumber= : Filter by tracking number}
+                            {--groupId= : Filter the results by Group ID}';
 
     /**
      * The console command description.
@@ -42,48 +46,36 @@ class FetchReports extends Command
     {
         $report_start = $this->getStartDate();
 
-        $groups = ['@' => 'web', '#' => 'book'];
+        while($report_start->lessThanOrEqualTo(now()->startOfMonth())) {
 
-        $reportCount = $report_start->diffInMonths(now(), false) * count($groups);
+            $date = $report_start->copy();
 
-        $bar = $this->output->createProgressBar($reportCount);
+            $params = [
+                'filter' => sprintf('call_started>=%s,call_started<=%s,duration>=%d',
+                    $date->startOfMonth()->toDateString(),
+                    $date->endOfMonth()->toDateString(),
+                    $this->option('duration')
+                ),
+                'limit' => $this->option('limit'),
+                'timezone' => 'America/New_York',
+                'offset' => '0',
+                'secondary' => 'campaign',
+            ];
 
-        foreach(array_keys($groups) as $group) {
-
-            $report_start = $this->getStartDate();
-
-            while($report_start->lessThanOrEqualTo(now()->startOfMonth())) {
-
-                $date = $report_start->copy();
-
-                if(!$this->reportExists($date, $groups[$group])) {
-
-                    $params = [
-                        'count' => 'true',
-                        'filtertype' => 'ha',
-                        'filter' => 'c.campaign_name,ILIKE,' . $group . ',',
-                        'report' => 'group_activity',
-                        'limit' => '100',
-                        'timezone' => 'America/New_York',
-                        'offset' => '0',
-                        'secondary' => 'campaign',
-                        'start_date' => $date->startOfMonth()->toDateString(),
-                        'end_date' => $date->endOfMonth()->toDateString(),
-                    ];
-
-                    $report = Convirza::getReport($params);
-
-                    $this->saveReport($report, $date, $groups[$group]);
-
-                }
-
-                $bar->advance();
-
-                $report_start->addMonth();
+            if($this->option('groupId')) {
+                $params['filter'] .= ',group_id='.$this->option('groupId');
             }
+
+            if($this->option('trackingNumber')) {
+                $params['filter'] .= ',tracking_number='.$this->option('trackingNumber');
+            }
+
+            $report = Convirza::getReport($params);
+
+            $report_start->addMonth();
         }
 
-        $bar->finish();
+        dd($report);
     }
 
     public function getStartDate()
@@ -95,30 +87,5 @@ class FetchReports extends Command
         }
 
         return $start_date;
-    }
-
-    private function reportExists($date, $group): bool
-    {
-        if($date->equalTo(now()->startOfMonth())) {
-            return false;
-        }
-
-        return ConvirzaReport::where('report_group', $group)
-                            ->where('start_date', $date->startOfMonth()->toDateString())
-                            ->where('end_date', $date->endOfMonth()->toDateString())
-                            ->exists();
-    }
-
-    private function saveReport($report, $date, $group)
-    {
-        $model = ConvirzaReport::firstOrNew([
-            'report_group' => $group,
-            'start_date' => $date->startOfMonth()->toDateString(),
-            'end_date' => $date->endOfMonth()->toDateString(),
-        ], $report);
-
-        $model->created_at = now();
-
-        $model->save();
     }
 }

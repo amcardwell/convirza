@@ -2,11 +2,17 @@
 
 namespace Skidaatl\Convirza;
 
+use Skidaatl\Convirza\Support\ReportCollection;
+
 class Convirza
 {
 	protected $api;
 
 	protected $config;
+
+	const GROUP_LIST_ENDPOINT = '/group/list';
+
+	const CALL_LIST_ENDPOINT = '/call/list';
 
 	public function __construct($config = [], $api = null)
 	{
@@ -21,23 +27,38 @@ class Convirza
 
 	public function getCalls($parameters = [])
 	{
-		$data = [];
+		$parameters['offset'] = $parameters['offset'] ?? 0;
 
-		$parameters['offset'] = 0;
+		$calls = $this->api
+			->request('GET', self::CALL_LIST_ENDPOINT, $parameters);
 
-		$i = 0;
-
-		$response = $this->api->request('GET', 'v2/call/list', $parameters);
-
-		while(count($response) === 100) {
-			if($i === 5) { break; }
-			array_push($data, $response);
-			$parameters['offset'] += 100;
-			$response = $this->api->request('GET', 'v2/call/list', $parameters);
-			$i++;
+		if(!isset($parameters['limit'])) {
+			while(count($calls == 100)) {
+				$parameters['offset'] += 100;
+				$calls = array_merge($calls, $this->getCalls($parameters));
+				return $calls;
+			}
 		}
 
-		return array_flatten($data, 1);
+		return $calls;
+	}
+
+	public function getGroups($parameters = [])
+	{
+		$parameters['offset'] = $parameters['offset'] ?? 0;
+
+		$groups = $this->api
+			->request('GET', self::GROUP_LIST_ENDPOINT, $parameters);
+
+		if(!isset($parameters['limit'])) {
+			while(count($groups) == 100) {
+				$parameters['offset'] += 100;
+				$groups = array_merge($groups, $this->getGroups($parameters));
+				return $groups;
+			}
+		}
+
+		return $groups;
 	}
 
 	public function getCall($id, $parameters = [])
@@ -52,9 +73,9 @@ class Convirza
 	public function getReport($parameters = [], $write = true)
 	{
 		$report = $this->api
-			->setEndpoint('https://api.convirza.com/v1/report')
-			->request('GET', '/groupActivities', $parameters);
+			->setEndpoint('https://apicfa.convirza.com/v2')
+			->request('GET', '/call/groupActivity', $parameters);
 
-		return $report[0];
+		return new ReportCollection($report);
 	}
 }

@@ -32,7 +32,7 @@ class ConvirzaApi
 	 * The REST API Endpoint
 	 * @var string $endpoint
 	 */
-	protected $endpoint = 'https://apicfa.convirza.com';
+	protected $endpoint = 'https://apicfa.convirza.com/v2';
 
 	/**
 	 * The API response code
@@ -104,14 +104,7 @@ class ConvirzaApi
 			]
 		];
 
-		try {
-			$response = $this->client->handleRequest($method, $this->endpoint . $path, $options, $tokens, $parameters);
-		} catch (ConvirzaApiException $e) {
-			dd($e);
-			if($e->getMessage() === 'Unauthorized') {
-				dd($e);
-			}
-		}
+		$response = $this->client->handleRequest($method, $this->endpoint . $path, $options, $tokens, $parameters);
 
 		if($response['result'] !== 'success') {
 			throw new ConvirzaBadRequestException($response['err']);
