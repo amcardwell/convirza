@@ -2,6 +2,7 @@
 
 namespace Skidaatl\Convirza;
 
+use Illuminate\Support\Facades\Cache;
 use Skidaatl\Convirza\Support\ReportCollection;
 
 class Convirza
@@ -9,6 +10,8 @@ class Convirza
 	protected $api;
 
 	protected $config;
+
+	protected $cache;
 
 	const GROUP_LIST_ENDPOINT = '/group/list';
 
@@ -21,6 +24,8 @@ class Convirza
 		if (is_null($api)) {
 			$api = new ConvirzaApi($config);
 		}
+
+		$this->cache = Cache::store($config['cache']['store']);
 
 		$this->api = $api;
 	}
@@ -45,18 +50,30 @@ class Convirza
 
 	public function getGroups($parameters = [])
 	{
+		$expires_at = now()->addSeconds($this->config['cache']['duration']);
+
+		if($this->cache->has('convirza_groups')) {
+			return $this->cache->get('convirza_groups');
+		}
+
 		$parameters['offset'] = $parameters['offset'] ?? 0;
 
-		$groups = $this->api
+		$groups = collect();
+
+		$response = $this->api
 			->request('GET', self::GROUP_LIST_ENDPOINT, $parameters);
 
+		$groups = $groups->merge($response);
+
 		if(!isset($parameters['limit'])) {
-			while(count($groups) == 100) {
+			while(count($response) == 100) {
 				$parameters['offset'] += 100;
-				$groups = array_merge($groups, $this->getGroups($parameters));
-				return $groups;
+				$response = $this->getGroups($parameters);
+				$groups = $groups->merge($response);
 			}
 		}
+
+		$this->cache->put('convirza_groups', $groups, $expires_at);
 
 		return $groups;
 	}
