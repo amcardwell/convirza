@@ -16,13 +16,11 @@ class ConvirzaServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        $this->app->bind(Convirza::class, function () {
-            return new Convirza(config('convirza.apikey'));
-        });
-
         $this->publishes([
-            __DIR__.'/../config/convirza.php' => config_path('convirza.php'),
+            __DIR__.'/../config/convirza.php' => config_path('convirza.php')
         ]);
+
+        $this->loadMigrationsFrom(__DIR__.'/database/migrations');
     }
 
     /**
@@ -32,10 +30,14 @@ class ConvirzaServiceProvider extends ServiceProvider
      */
     public function register()
     {
+        $this->mergeConfigFrom(__DIR__.'/../config/convirza.php', 'convirza');
+
         $this->app->bind('convirza', function () {
-            return $this->app->make(Convirza::class);
+            return new Convirza(config('convirza'));
         });
 
-        $this->mergeConfigFrom(__DIR__.'/../config/convirza.php', 'convirza');
+        $this->commands([
+            Commands\FetchReports::class
+        ]);
     }
 }

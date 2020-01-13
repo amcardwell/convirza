@@ -4,121 +4,125 @@ namespace Skidaatl\Convirza;
 
 use Skidaatl\Convirza\Exception\ConvirzaBadRequestException;
 use Skidaatl\Convirza\Exception\ConvirzaException;
-use Skidaatl\Convirza\Exception\ConvirzaInternalErrorException;
+use Skidaatl\Convirza\Exception\ConvirzaApiException;
 
 class ConvirzaApi
 {
-    protected $apikey;
-    protected $baseurl = 'https://apicfa.convirza.com/v2';
-    protected $responseCode;
+	/**
+	 * The HTTP client.
+	 *
+	 * @var Client $client
+	 */
+	protected $client;
 
-    public function __construct(string $apikey)
-    {
-        $this->apikey = $apikey;
-        $exploded = explode('-', $apikey);
-        $this->baseurl = str_replace('<dc>', array_pop($exploded), $this->baseurl);
-    }
+	/**
+	 * The config object.
+	 *
+	 * @var array $config
+	 */
+	protected $config;
 
-    // API calls --------------------------------------------------------------
+	/**
+	 * The Authentication class
+	 * @var ConvirzaAuth $auth
+	 */
+	protected $auth;
 
-    public function getLists(array $params = []): array
-    {
-        return $this->call('get', '/lists', $params);
-    }
+	/**
+	 * The REST API Endpoint
+	 * @var string $endpoint
+	 */
+	protected $endpoint = 'https://apicfa.convirza.com';
 
-    public function getList(string $listId): array
-    {
-        return $this->call('get', '/lists/' . $listId);
-    }
+	/**
+	 * The API response code
+	 * @var string $responseCode
+	 */
+	protected $responseCode;
 
-    public function getMember(string $listId, string $memberId): array
-    {
-        return $this->call('get', "/lists/{$listId}/members/{$memberId}");
-    }
+	/**
+	 * ConvirzaApi Constructor
+	 * @param array $config
+	 */
+	public function __construct($config = [])
+	{
+		$this->config = $config;
 
-    public function addUpdate(string $listId, string $email, array $merge, bool $confirm)
-    {
-        $email = strtolower($email);
-        $memberId = md5($email);
-        $data = [
-            'email_address' => $email,
-            'status_if_new' => $confirm ? 'pending' : 'subscribed',
-            'status'        => $confirm ? 'pending' : 'subscribed',
-        ];
-        // Empty array doesn't work
-        if ($merge) {
-            $data['merge_fields'] = $merge;
-        }
-        $this->call('put', "/lists/{$listId}/members/{$memberId}", $data);
-    }
+		$this->client = new Client([
+			'base_uri' => $this->endpoint,
+			'debug' => $config['debug']
+		]);
 
-    public function addUpdateMember(string $listId, Member $member)
-    {
-        $this->call('put', "/lists/{$listId}/members/{$member->hash()}", $member->parameters());
-    }
+		$this->auth = new ConvirzaAuth;
 
-    public function unsubscribe(string $listId, string $email)
-    {
-        $memberId = md5(strtolower($email));
-        $this->call('put', "/lists/{$listId}/members/{$memberId}", ['email_address' => $email, 'status_if_new' => 'unsubscribed', 'status' => 'unsubscribed']);
-    }
+		if($this->auth->isEmpty() || $this->auth->isExpired()) {
+			$this->fetchApiKey();
+		}
+	}
 
-    // HTTP -------------------------------------------------------------------
+	public function fetchApiKey()
+	{
+		$response = $this->client->handleRequest('POST', '/oauth/token', null, [
+			'grant_type' => 'password',
+			'client_id' => 'system',
+			'client_secret' => 'f558ba166258089b2ef322c340554c',
+			'username' => $this->config['username'],
+			'password' => $this->config['password']
+		]);
 
-    public function call(string $method, string $endpoint, array $data = []): array
-    {
-        $method = strtolower($method);
-        if (!in_array($method, ['get', 'put', 'post', 'delete', 'patch'])) {
-            throw new ConvirzaException('Invalid API call method: ' . $method);
-        }
-        if (in_array($method, ['get', 'delete'])) {
-            $url = $this->baseurl . $endpoint;
-            $url .= $data ? '?' . http_build_query($data) : '';
-            $response = Requests::$method($url, $this->headers(), $this->options());
-        } else {
-            $response = Requests::$method(
-                $this->baseurl . $endpoint,
-                $this->headers(),
-                json_encode($data),
-                $this->options()
-            );
-        }
-        $this->responseCode = intval($response->status_code);
-        if ($this->responseCode >= 400) {
-            $this->apiError($response);
-        }
-        return json_decode($response->body, true) ?? [];
-    }
+		$this->auth->setAccessToken($response['access_token'], $response['expires_in']);
+	}
 
-    protected function options(): array
-    {
-        return [
-            'auth' => new Requests_Auth_Basic(['mcuser', $this->apikey]),
-        ];
-    }
+	public function setEndpoint(string $endpoint)
+	{
+		$this->endpoint = $endpoint;
 
-    protected function headers(): array
-    {
-        return [];
-    }
+		return $this;
+	}
 
-    protected function apiError(Requests_Response $response)
-    {
-        $info = var_export(json_decode($response->body, true), true);
-        $message = "Mailchimp API error (" . $response->status_code . "): " . $info;
-        if ($this->responseCode <= 499) {
-            throw new ConvirzaBadRequestException($message, $this->responseCode, null, $response->body);
-        }
-        throw new ConvirzaInternalErrorException($message, $this->responseCode);
-    }
+	/**
+	 * Makes a request to the Convirza API.
+	 *
+	 * @param string $method
+	 *   The REST method to use when making the request.
+	 * @param string $path
+	 *   The API path to request.
+	 * @param array $tokens
+	 *   Associative array of tokens and values to replace in the path.
+	 * @param array $parameters
+	 *   Associative array of parameters to send in the request body.
+	 *
+	 * @return mixed
+	 *
+	 * @throws ConvirzaApiException
+	 */
+	public function request($method, $path, $tokens = NULL, $parameters = NULL)
+	{
+		$options = [
+			'headers' => [
+				'Authorization' => 'bearer ' . $this->auth->getToken()
+			]
+		];
 
-    public function responseCode(): int
-    {
-        return $this->responseCode;
-    }
+		try {
+			$response = $this->client->handleRequest($method, $this->endpoint . $path, $options, $tokens, $parameters);
+		} catch (ConvirzaApiException $e) {
+			dd($e);
+			if($e->getMessage() === 'Unauthorized') {
+				dd($e);
+			}
+		}
 
-    public function responseCodeNotFound(): bool
-    {
-        return $this->responseCode == 404;
-    }
+		if($response['result'] !== 'success') {
+			throw new ConvirzaBadRequestException($response['err']);
+		}
+
+		if(isset($response['data'])) {
+			return $response['data'];
+		} elseif(isset($response['json'])) {
+			return $response['json'];
+		} else {
+			return $response;
+		}
+	}
 }

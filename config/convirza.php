@@ -1,5 +1,7 @@
 <?php
 
 return [
-    'apikey' => env('CONVIRZA_KEY'),
+    'username' => env('CONVIRZA_USER'),
+    'password' => env('CONVIRZA_PASS'),
+    'debug' => env('CONVIRZA_DEBUG', false)
 ];
