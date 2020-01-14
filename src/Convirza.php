@@ -3,6 +3,8 @@
 namespace Skidaatl\Convirza;
 
 use Illuminate\Support\Facades\Cache;
+use Skidaatl\Convirza\Support\GroupCollection;
+use Skidaatl\Convirza\Support\GroupItem;
 use Skidaatl\Convirza\Support\ReportCollection;
 
 class Convirza
@@ -48,32 +50,23 @@ class Convirza
 		return $calls;
 	}
 
-	public function getGroups($parameters = [])
+	public function fetchGroups($parameters = [])
 	{
-		$expires_at = now()->addSeconds($this->config['cache']['duration']);
-
-		if($this->cache->has('convirza_groups')) {
-			return $this->cache->get('convirza_groups');
-		}
-
 		$parameters['offset'] = $parameters['offset'] ?? 0;
-
-		$groups = collect();
 
 		$response = $this->api
 			->request('GET', self::GROUP_LIST_ENDPOINT, $parameters);
 
-		$groups = $groups->merge($response);
+		$groups = new GroupCollection($response);
 
 		if(!isset($parameters['limit'])) {
-			while(count($response) == 100) {
+			if(count($response) == 100) {
 				$parameters['offset'] += 100;
 				$response = $this->getGroups($parameters);
 				$groups = $groups->merge($response);
+				return $groups;
 			}
 		}
-
-		$this->cache->put('convirza_groups', $groups, $expires_at);
 
 		return $groups;
 	}
