@@ -2,9 +2,11 @@
 
 namespace Skidaatl\Convirza;
 
+use Skidaatl\Convirza\Exception\ConvirzaApiException;
 use Skidaatl\Convirza\Exception\ConvirzaBadRequestException;
 use Skidaatl\Convirza\Exception\ConvirzaException;
-use Skidaatl\Convirza\Exception\ConvirzaApiException;
+use Skidaatl\Convirza\Http\Client;
+use Skidaatl\Convirza\Http\ConvirzaResponse;
 
 class ConvirzaApi
 {
@@ -92,7 +94,7 @@ class ConvirzaApi
 	 * @param array $parameters
 	 *   Associative array of parameters to send in the request body.
 	 *
-	 * @return mixed
+	 * @return ConvirzaResponse
 	 *
 	 * @throws ConvirzaApiException
 	 */
@@ -106,16 +108,6 @@ class ConvirzaApi
 
 		$response = $this->client->handleRequest($method, $this->endpoint . $path, $options, $tokens, $parameters);
 
-		if($response['result'] !== 'success') {
-			throw new ConvirzaBadRequestException($response['err']);
-		}
-
-		if(isset($response['data'])) {
-			return $response['data'];
-		} elseif(isset($response['json'])) {
-			return $response['json'];
-		} else {
-			return $response;
-		}
+		return new ConvirzaResponse($response);
 	}
 }

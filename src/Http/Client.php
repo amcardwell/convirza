@@ -1,6 +1,6 @@
 <?php
 
-namespace Skidaatl\Convirza;
+namespace Skidaatl\Convirza\Http;
 
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\RequestException;

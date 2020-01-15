@@ -3,9 +3,6 @@
 namespace Skidaatl\Convirza;
 
 use Illuminate\Support\Facades\Cache;
-use Skidaatl\Convirza\Support\GroupCollection;
-use Skidaatl\Convirza\Support\GroupItem;
-use Skidaatl\Convirza\Support\ReportCollection;
 
 class Convirza
 {
@@ -15,9 +12,17 @@ class Convirza
 
 	protected $cache;
 
+	const GROUP_ENDPOINT = '/group';
+
 	const GROUP_LIST_ENDPOINT = '/group/list';
 
+	const CALL_ENDPOINT = '/call';
+
 	const CALL_LIST_ENDPOINT = '/call/list';
+
+	const CAMPAIGN_ENDPOINT = '/campaign';
+
+	const CAMPAIGN_LIST_ENDPOINT = '/campaign/list';
 
 	public function __construct($config = [], $api = null)
 	{
@@ -32,60 +37,81 @@ class Convirza
 		$this->api = $api;
 	}
 
-	public function getCalls($parameters = [])
+	public function fetchCall($id)
+	{
+		return new Support\CallItem($this->makeCachedRequest('GET', self::CALL_ENDPOINT, ['id' => $id]));
+	}
+
+	public function fetchCalls(array $parameters = [])
+	{
+		$response = $this->makeCachedRequest('GET', self::CALL_LIST_ENDPOINT, $parameters);
+
+		return (new Support\CallCollection($response))->mapInto(Support\CallItem::class);
+	}
+
+	public function fetchGroup($id)
+	{
+		return new Support\GroupItem($this->makeCachedRequest('GET', self::GROUP_ENDPOINT, ['id' => $id]));
+	}
+
+	public function fetchGroups(array $parameters = [])
+	{
+		$response = $this->makeCachedRequest('GET', self::GROUP_LIST_ENDPOINT, $parameters);
+
+		return (new Support\GroupCollection($response))->mapInto(Support\GroupItem::class);
+	}
+
+	public function fetchCampaign($id)
+	{
+		return new Support\CampaignItem($this->makeCachedRequest('GET', self::CAMPAIGN_ENDPOINT, ['id' => $id]));
+	}
+
+	public function fetchCampaigns(array $parameters = [])
+	{
+		$response = $this->makeCachedRequest('GET', self::CAMPAIGN_LIST_ENDPOINT, $parameters);
+
+		return (new Support\CampaignCollection($response))->mapInto(Support\CampaignItem::class);
+	}
+
+	public function fetchGroupActivity(array $parameters = [])
+	{
+		$response = $this->makeCachedRequest('GET', self::CALL_GROUP_ACTIVITY_ENDPOINT, $parameters);
+
+		return (new Support\CallGroupActivityCollection($response))->mapInto(Support\CallGroupActivityItem::class);
+	}
+
+	private function makeRequest($method, $url, array $parameters = [])
 	{
 		$parameters['offset'] = $parameters['offset'] ?? 0;
 
-		$calls = $this->api
-			->request('GET', self::CALL_LIST_ENDPOINT, $parameters);
+		$response = $this->api->request($method, $url, $parameters);
 
-		if(!isset($parameters['limit'])) {
-			while(count($calls == 100)) {
+		$data = $response->data;
+
+		if(count($data) === 100) {
+			while(count($data) === 100) {
+				if(isset($parameters['limit'])) {
+					$parameters['limit'] -= 100;
+				}
 				$parameters['offset'] += 100;
-				$calls = array_merge($calls, $this->getCalls($parameters));
-				return $calls;
+				$response = $this->api->request($method, $url, $parameters);
+				$data = array_merge($data, $response->data);
 			}
 		}
 
-		return $calls;
+		return $data;
 	}
 
-	public function fetchGroups($parameters = [])
+	private function makeCachedRequest($method, $url, array $parameters = [])
 	{
-		$parameters['offset'] = $parameters['offset'] ?? 0;
+		$expires_at = now()->addSeconds($this->config['cache']['duration']);
 
-		$response = $this->api
-			->request('GET', self::GROUP_LIST_ENDPOINT, $parameters);
+		$cacheKey = 'convirza_'.md5($method.$url.json_encode($parameters));
 
-		$groups = new GroupCollection($response);
+		$args = func_get_args();
 
-		if(!isset($parameters['limit'])) {
-			if(count($response) == 100) {
-				$parameters['offset'] += 100;
-				$response = $this->getGroups($parameters);
-				$groups = $groups->merge($response);
-				return $groups;
-			}
-		}
-
-		return $groups;
-	}
-
-	public function getCall($id, $parameters = [])
-	{
-		$tokens = [
-			'id' => $id
-		];
-
-		return $this->api->request('GET', 'v2/call', $tokens, $parameters);
-	}
-
-	public function getReport($parameters = [], $write = true)
-	{
-		$report = $this->api
-			->setEndpoint('https://apicfa.convirza.com/v2')
-			->request('GET', '/call/groupActivity', $parameters);
-
-		return new ReportCollection($report);
+		return $this->cache->remember($cacheKey, $expires_at, function() use ($args) {
+			return $this->makeRequest(...$args);
+		});
 	}
 }
