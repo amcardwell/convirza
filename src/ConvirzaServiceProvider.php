@@ -35,9 +35,5 @@ class ConvirzaServiceProvider extends ServiceProvider
         $this->app->bind('convirza', function () {
             return new Convirza(config('convirza'));
         });
-
-        $this->commands([
-            Commands\FetchReports::class
-        ]);
     }
 }
