@@ -20,6 +20,8 @@ class Convirza
 
 	const CALL_LIST_ENDPOINT = '/call/list';
 
+	const CALL_GROUP_ACTIVITY_ENDPOINT = '/call/groupActivity';
+
 	const CAMPAIGN_ENDPOINT = '/campaign';
 
 	const CAMPAIGN_LIST_ENDPOINT = '/campaign/list';
@@ -73,11 +75,24 @@ class Convirza
 		return (new Support\CampaignCollection($response))->mapInto(Support\CampaignItem::class);
 	}
 
-	public function fetchGroupActivity(array $parameters = [])
+	public function fetchCallGroupActivity(array $parameters = [])
 	{
 		$response = $this->makeCachedRequest('GET', self::CALL_GROUP_ACTIVITY_ENDPOINT, $parameters);
 
 		return (new Support\CallGroupActivityCollection($response))->mapInto(Support\CallGroupActivityItem::class);
+	}
+
+	private function makeCachedRequest($method, $url, array $parameters = [])
+	{
+		$expires_at = now()->addSeconds($this->config['cache']['duration']);
+
+		$cacheKey = 'convirza_'.md5($method.$url.json_encode($parameters));
+
+		$args = func_get_args();
+
+		return $this->cache->remember($cacheKey, $expires_at, function() use ($args) {
+			return $this->makeRequest(...$args);
+		});
 	}
 
 	private function makeRequest($method, $url, array $parameters = [])
@@ -100,18 +115,5 @@ class Convirza
 		}
 
 		return $data;
-	}
-
-	private function makeCachedRequest($method, $url, array $parameters = [])
-	{
-		$expires_at = now()->addSeconds($this->config['cache']['duration']);
-
-		$cacheKey = 'convirza_'.md5($method.$url.json_encode($parameters));
-
-		$args = func_get_args();
-
-		return $this->cache->remember($cacheKey, $expires_at, function() use ($args) {
-			return $this->makeRequest(...$args);
-		});
 	}
 }
