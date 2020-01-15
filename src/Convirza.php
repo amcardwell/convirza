@@ -104,7 +104,7 @@ class Convirza
 		$data = $response->data;
 
 		if(count($data) === 100) {
-			while(count($data) === 100) {
+			while(count($response->data) === 100) {
 				if(isset($parameters['limit'])) {
 					$parameters['limit'] -= 100;
 				}

@@ -35,5 +35,7 @@ class ConvirzaServiceProvider extends ServiceProvider
         $this->app->bind('convirza', function () {
             return new Convirza(config('convirza'));
         });
+
+        $this->app->alias('convirza', Convirza::class);
     }
 }
