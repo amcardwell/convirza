@@ -12,6 +12,8 @@ class Convirza
 
 	protected $cache;
 
+	protected $shouldCache = true;
+
 	const GROUP_ENDPOINT = '/group';
 
 	const GROUP_LIST_ENDPOINT = '/group/list';
@@ -37,6 +39,13 @@ class Convirza
 		$this->cache = Cache::store($config['cache']['store']);
 
 		$this->api = $api;
+	}
+
+	public function withoutCache()
+	{
+		$this->shouldCache = false;
+
+		return $this;
 	}
 
 	public function fetchCall($id)
@@ -84,6 +93,10 @@ class Convirza
 
 	private function makeCachedRequest($method, $url, array $parameters = [])
 	{
+		if(!$this->shouldCache) {
+			return $this->makeRequest($method, $url, $parameters);
+		}
+
 		$expires_at = now()->addSeconds($this->config['cache']['duration']);
 
 		$cacheKey = 'convirza_'.md5($method.$url.json_encode($parameters));
