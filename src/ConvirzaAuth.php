@@ -2,8 +2,17 @@
 
 namespace Skidaatl\Convirza;
 
+use Skidaatl\Convirza\Http\Client;
+
 class ConvirzaAuth
 {
+	/**
+	 * The http client
+	 *
+	 * @var string
+	 */
+	protected $client;
+
 	/**
 	 * The access token value.
 	 *
@@ -21,11 +30,14 @@ class ConvirzaAuth
 	/**
 	 * Create a new access token entity.
 	 *
+	 * @param Skidaatl\Convirza\Http\Client $client
 	 * @param string $accessToken
 	 * @param int    $expiresAt
 	 */
-	public function __construct($accessToken = null, $expiresAt = 0)
+	public function __construct(Client $client, $accessToken = null, $expiresAt = 0)
 	{
+		$this->client = $client;
+
 		if(!is_null($accessToken)) {
 
 			$this->token = $accessToken;

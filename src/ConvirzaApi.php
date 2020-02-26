@@ -55,7 +55,7 @@ class ConvirzaApi
 			'debug' => $config['debug']
 		]);
 
-		$this->auth = new ConvirzaAuth;
+		$this->auth = new ConvirzaAuth($this->client);
 	}
 
 	public function getAuth()
