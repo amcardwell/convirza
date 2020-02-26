@@ -41,6 +41,11 @@ class Convirza
 		$this->api = $api;
 	}
 
+	public function getAuth()
+	{
+		return $this->api->auth;
+	}
+
 	public function withoutCache()
 	{
 		$this->shouldCache = false;
