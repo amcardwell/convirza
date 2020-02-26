@@ -136,7 +136,6 @@ class ConvirzaAuth
 	 */
 	public function getToken()
 	{
-		if($this->isExpired())
 		return $this->token;
 	}
 
