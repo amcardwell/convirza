@@ -56,28 +56,11 @@ class ConvirzaApi
 		]);
 
 		$this->auth = new ConvirzaAuth;
-
-		if($this->auth->isEmpty() || $this->auth->isExpired()) {
-			$this->fetchApiKey();
-		}
 	}
 
 	public function getAuth()
 	{
 		return $this->auth;
-	}
-
-	public function fetchApiKey()
-	{
-		$response = $this->client->handleRequest('POST', '/oauth/token', null, [
-			'grant_type' => 'password',
-			'client_id' => 'system',
-			'client_secret' => 'f558ba166258089b2ef322c340554c',
-			'username' => $this->config['username'],
-			'password' => $this->config['password']
-		]);
-
-		$this->auth->setAccessToken($response['access_token'], $response['expires_in']);
 	}
 
 	public function setEndpoint(string $endpoint)

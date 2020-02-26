@@ -39,6 +39,23 @@ class ConvirzaAuth
 			$this->fetchAccessTokenFromDatabase();
 
 		}
+
+		if($this->isEmpty() || $this->isExpired()) {
+			$this->fetchApiKey();
+		}
+	}
+
+	public function fetchApiKey()
+	{
+		$response = $this->client->handleRequest('POST', '/oauth/token', null, [
+			'grant_type' => 'password',
+			'client_id' => 'system',
+			'client_secret' => 'f558ba166258089b2ef322c340554c',
+			'username' => config('convirza.username'),
+			'password' => config('convirza.password')
+		]);
+
+		$this->setAccessToken($response['access_token'], $response['expires_in']);
 	}
 
 	/**
@@ -107,6 +124,7 @@ class ConvirzaAuth
 	 */
 	public function getToken()
 	{
+		if($this->isExpired())
 		return $this->token;
 	}
 
