@@ -43,7 +43,7 @@ class Convirza
 
 	public function getAuth()
 	{
-		return $this->api->auth;
+		return $this->api->getAuth();
 	}
 
 	public function withoutCache()

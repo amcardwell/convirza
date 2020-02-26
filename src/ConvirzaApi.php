@@ -62,6 +62,11 @@ class ConvirzaApi
 		}
 	}
 
+	public function getAuth()
+	{
+		return $this->auth;
+	}
+
 	public function fetchApiKey()
 	{
 		$response = $this->client->handleRequest('POST', '/oauth/token', null, [
