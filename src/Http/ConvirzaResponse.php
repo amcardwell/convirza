@@ -14,13 +14,15 @@ class ConvirzaResponse
 
 	public function __construct(array $items)
 	{
-		if($items['result'] !== 'success') {
+		if( $items['result'] !== 'success' &&
+			$items['err'] !== 'no records found.'
+		) {
 			throw new ConvirzaBadRequestException($items['err']);
 		}
 
 		$this->result = $items['result'];
 		$this->error = $items['err'];
-		$this->data = $items['data'];
+		$this->data = $items['data'] ?? [];
 	}
 
 	public function count()
