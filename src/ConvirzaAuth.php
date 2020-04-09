@@ -136,6 +136,10 @@ class ConvirzaAuth
 	 */
 	public function getToken()
 	{
+		if($this->isExpired()) {
+			$this->fetchApiKey();
+		}
+
 		return $this->token;
 	}
 
