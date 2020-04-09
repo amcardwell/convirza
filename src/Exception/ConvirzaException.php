@@ -2,7 +2,9 @@
 
 namespace Skidaatl\Convirza\Exception;
 
-class ConvirzaException extends \Exception
+use Exception;
+
+class ConvirzaException extends Exception
 {
 
 }
